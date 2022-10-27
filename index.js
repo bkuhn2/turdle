@@ -3,6 +3,17 @@ var winningWord = '';
 var currentRow = 1;
 var guess = '';
 var gamesPlayed = [];
+var words = [];
+
+const loadData = () => {
+  return fetch('http://localhost:3001/api/v1/words')
+    .then(response => response.json())
+    .then(data => {
+      words = data
+      setGame()
+    })
+    .catch(error => console.log("There was an error loading the data!", error))
+}
 
 // Query Selectors
 var inputs = document.querySelectorAll('input');
@@ -20,8 +31,13 @@ var gameOverBox = document.querySelector('#game-over-section');
 var gameOverGuessCount = document.querySelector('#game-over-guesses-count');
 var gameOverGuessGrammar = document.querySelector('#game-over-guesses-plural');
 
+var lossSection = document.querySelector('#loss-section')
+var totalGames = document.querySelector('#stats-total-games')
+var percentCorrect = document.querySelector('#stats-percent-correct')
+var averageGuesses = document.querySelector('#stats-average-guesses')
+
 // Event Listeners
-window.addEventListener('load', setGame);
+window.addEventListener('load', loadData);
 
 for (var i = 0; i < inputs.length; i++) {
   inputs[i].addEventListener('keyup', function() { moveToNextInput(event) });
@@ -44,6 +60,7 @@ function setGame() {
   currentRow = 1;
   winningWord = getRandomWord();
   updateInputPermissions();
+  
 }
 
 function getRandomWord() {
@@ -66,7 +83,7 @@ function updateInputPermissions() {
 function moveToNextInput(e) {
   var key = e.keyCode || e.charCode;
 
-  if( key !== 8 && key !== 46 ) {
+  if( key !== 8 && key !== 46 && currentRow < 7) {
     var indexOfNext = parseInt(e.target.id.split('-')[2]) + 1;
     inputs[indexOfNext].focus();
   }
@@ -93,8 +110,10 @@ function submitGuess() {
     compareGuess();
     if (checkForWin()) {
       setTimeout(declareWinner, 1000);
-    } else {
+    } else if(currentRow < 6) {
       changeRow();
+    } else {
+      setTimeout(declareLoser, 1000)
     }
   } else {
     errorMessage.innerText = 'Not a valid word. Try again!';
@@ -172,8 +191,20 @@ function declareWinner() {
   setTimeout(startNewGame, 4000);
 }
 
+function declareLoser() {
+  recordGameStats();
+  lossSection.classList.remove('collapsed')
+  letterKey.classList.add('hidden');
+  gameBoard.classList.add('collapsed');
+  setTimeout(startNewGame, 4000);
+}
+
 function recordGameStats() {
-  gamesPlayed.push({ solved: true, guesses: currentRow });
+  if (checkForWin()) {
+    gamesPlayed.push({ solved: true, guesses: currentRow });
+  } else {
+    gamesPlayed.push({ solved: false, guesses: currentRow });
+  }
 }
 
 function changeGameOverText() {
@@ -190,6 +221,7 @@ function startNewGame() {
   clearKey();
   setGame();
   viewGame();
+  lossSection.classList.add('collapsed')
   inputs[0].focus();
 }
 
@@ -237,6 +269,19 @@ function viewStats() {
   viewGameButton.classList.remove('active');
   viewRulesButton.classList.remove('active');
   viewStatsButton.classList.add('active');
+
+  totalGames.innerText = gamesPlayed.length
+
+  var rawPercent = (gamesPlayed.filter(game => game.solved === true).length / gamesPlayed.length) * 100
+
+  percentCorrect.innerText = rawPercent.toFixed(2)
+  
+  var totalGuessesToFindCorrect = 0;
+  gamesPlayed.filter(game => game.solved === true).forEach(game => {
+    totalGuessesToFindCorrect += game.guesses;
+  })
+  
+  averageGuesses.innerText = totalGuessesToFindCorrect / gamesPlayed.filter(game => game.solved === true).length
 }
 
 function viewGameOverMessage() {
